@@ -161,8 +161,9 @@ def GenCNF (bitlen, shift):
     os.chdir (cdir + '/grainofsalt/build')
     
     # Calculate filename and path
+    # Fix name calc from output len
     filename = 'crypto1-0-' + str(bitlen) + '-' + \
-               str(shift) + '-0xe9fc41c974630-1.cnf'
+               str(shift) + '-0xe9fc41c974630008-1.cnf'
     abspath = os.getcwd() + '/satfiles/' + filename
 
     # Call grainofsalt
@@ -213,10 +214,8 @@ if __name__ == '__main__':
     # Call generator
     if args.gen_bits:
         solver = GenCNF (args.gen_bits, args.shift)
-        known = CNFArray ('0xe9fc41c974630', length=50)
+        #known = CNFArray ('0xe9fc41c974630008', length=64)
+        known = CNFArray ('0x5a7be10a7259ef48', length=64)
         print (known)
         key = solver.Solve (known)
         print (key.asHex())
-        #solver.Solve ('0x887b631497d0c')
-        #solver.Solve ('0x5a7be10a7259c')
-        #solver.Solve ('0x350b8357adb24')
