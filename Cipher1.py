@@ -55,7 +55,7 @@ class PRNG:
         init = swap32binarr (init)
         self.lfsr = LFSR (initstate=init,
                           fpoly=[16,14,13,11])
-        self.lfsr.info()
+        #self.lfsr.info()
     def run(self, count):
         for n in range (count):
             self.lfsr.next()
@@ -79,10 +79,10 @@ class Crypto1:
                     raise ValueError ('Invalid key format')
         else:
             raise ValueError ('Invalid key format')
-        
-        # Reverse key to match LFSR
-        key = key[::-1]
 
+        # Not sure where this is spec'd but matching proxmark
+        key = self.KeyDerive (key)
+        
         # Note feedback is backwards and bit10 is corrected
         # compared to online images
         poly=[48, 43, 39, 38, 36, 34, 33, 31, 29, 24, 23,
@@ -90,69 +90,90 @@ class Crypto1:
         # Main crypto1 state
         self.sr = LFSR (initstate=key,fpoly=poly)
 
-    def Output(self, bits, xor_in=[]):
+    def KeyDerive (self, key):
+        nkey = []
+        for n in range (47, -1, -1):
+            nkey.append (key[n ^ 7])
+        return nkey
+
+    def KeyReverse (self):
+        key = self.sr.state
+        nkey = 0
+        idx = 47
+        for b in key[::-1]:
+            if (b):
+                nkey |= (1 << (idx ^ 7))
+            idx -= 1
+        return nkey
+            
+    def GetBit (self, inp=0, encrypt=False):
 
         # 3 NLFs in two layers
         nla = NLF(0x9e98)
         nlb = NLF(0xb48e)
         nlc = NLF(0xec57e80a)
-        out = []
-        for n in range (bits):
-            s = self.sr.state
-            
-            # Cycle LFSR with feedback
-            self.sr.next()
+                    
+        # Calculate layer one
+        s = self.sr.state
+        layer1 = [nla.compute ([s[0],  s[2],  s[4],  s[6]]),
+                  nlb.compute ([s[8],  s[10], s[12], s[14]]),
+                  nla.compute ([s[16], s[18], s[20], s[22]]),
+                  nla.compute ([s[24], s[26], s[28], s[30]]),
+                  nlb.compute ([s[32], s[34], s[36], s[38]])]
+        
+        # Get output from NLF layers
+        b = nlc.compute (layer1)
 
-            # XOR input if necessary
-            if n < len(xor_in):
-                self.sr.state[0] ^= xor_in[n]
-                
-            # Calculate layer one
-            layer1 = [nla.compute ([s[0], s[2], s[4], s[6]]),
-                      nlb.compute ([s[8], s[10], s[12], s[14]]),
-                      nla.compute ([s[16], s[18], s[20], s[22]]),
-                      nla.compute ([s[24], s[26], s[28], s[30]]),
-                      nlb.compute ([s[32], s[34], s[36], s[38]])]
+        # Cycle LFSR with feedback
+        self.sr.next()
 
-            # Get output from NLF layers
-            b = nlc.compute (layer1)
-            out.append (b)
+        # Feed in input
+        self.sr.state[0] ^= inp        
+
+        # Feedback output on encryption
+        if encrypt:
+            self.sr.state[0] ^= b
 
         # Return output
-        return out
+        return b
+
+    def Run (self, cnt):
+        for n in range (cnt):
+            pass
         
-# UID
-uid = int('0x6ad2f78d', 16)
-nt = int ('0x01200145', 16)
-nr = int ('0x3a90b2f2', 16)
+    def GetByte (self, inp=0, encrypt=False):
+        ret = []
+        inp = [x for x in int2binarr(inp, 8)[::-1]]
+        for n in inp:
+            ret.insert (0, self.GetBit(n, encrypt))
+        return binarr2int (ret)
 
-# XOR them
-uid_nt = uid ^ nt
+    def GetWord (self, inp=0, encrypt=False):
+        ret = 0
+        ret |= self.GetByte ((inp >> 24) & 0xFF, encrypt) << 24;
+        ret |= self.GetByte ((inp >> 16) & 0xFF, encrypt) << 16;
+        ret |= self.GetByte ((inp >> 8) & 0xFF, encrypt) << 8;
+        ret |= self.GetByte ((inp >> 0) & 0xFF, encrypt) << 0;
+        return ret
 
-cipher = Crypto1('0xFFFFFFFFFFFF')
-cipher.Output (32, int2binarr(uid, 32)[::-1])
 
-a = cipher.Output (8, int2binarr (0x3a, 8)[::-1])
-b = cipher.Output (8, int2binarr (0x90, 8)[::-1])
-c = cipher.Output (8, int2binarr (0xb2, 8)[::-1])
-d = cipher.Output (8, int2binarr (0xf2, 8)[::-1])
-dump_binarr (a)
-dump_binarr (b)
-dump_binarr (c)
-dump_binarr (d)
+if __name__ == '__main__':
+    # UID
+    uid = int('0x6ad2f78d', 16)
+    nt = int ('0x01200145', 16)
+    nr = int ('0x3a90b2f2', 16)
 
-prng = PRNG ('0x1234')
-#dump_binarr(prng.word ())
-lfsr = LFSR (initstate='random',
-             fpoly=[16,14,13,11], counter_start_zero=False)
-lfsr.info()
+    # XOR them
+    uid_nt = uid ^ nt
+    print ('Nt^UID={}'.format(hex (uid_nt)))
+    
+    cipher = Crypto1(0x112233445566)
+    print (hex(cipher.KeyReverse ()))
+    print (hex(cipher.GetByte (0x11)))
+    print (hex(cipher.GetByte (0x22)))
+    print (hex(cipher.GetByte (0x33)))
+    print (hex(cipher.GetByte (0x44)))
+    print (hex (cipher.GetWord (uid_nt)))
+    print (hex (cipher.GetWord (uid_nt, encrypt=True)))
 
-fig, ax = plt.subplots(figsize=(8,3))
-for _ in range(35):
-  ax.clear()
-  lfsr.Viz(ax=ax, title='R1')
-  plt.ylim([-0.1,None])
-  #plt.tight_layout()
-  lfsr.next()
-  fig.canvas.draw()
-  plt.pause(0.1)
+
