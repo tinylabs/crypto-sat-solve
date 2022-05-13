@@ -59,10 +59,13 @@ class PRNG:
     def run(self, count):
         for n in range (count):
             self.lfsr.next()
-        return swap32binarr(self.lfsr.state)
+        return swap32int (binarr2int (self.lfsr.state))
     
-    def word(self):
+    def GetWord(self):
         return self.run (32)
+
+    def GetByte(self):
+        return self.run (8) & 0xFF
 
 # Crypto1 cipher
 class Crypto1:
@@ -156,24 +159,40 @@ class Crypto1:
         ret |= self.GetByte ((inp >> 0) & 0xFF, encrypt) << 0;
         return ret
 
+    # Gen NR AR from UID, Nt, Nr
+    def ReaderAuth (self, uid, nt, nr):
+        uid_nt = uid ^ nt
+        self.GetWord (uid ^ nt)
+        # Generate Nr
+        Nr = self.GetWord (nr) ^ nr
+        # Generate Ar
+        self.prng = PRNG (nt)
+        # Cycle 32bits
+        self.prng.GetWord ()
+        ntp = int.from_bytes([self.prng.GetByte() for x in range (4)], 'big')
+        Ar = ntp ^ self.GetWord()
+        return Nr.to_bytes (4, 'big') + Ar.to_bytes (4, 'big')
 
+    def CardAuth (self):
+        ntp = int.from_bytes([self.prng.GetByte() for x in range (4)], 'big')
+        At = ntp ^ self.GetWord()
+        return At.to_bytes (4, 'big')
+        
 if __name__ == '__main__':
-    # UID
-    uid = int('0x6ad2f78d', 16)
-    nt = int ('0x01200145', 16)
-    nr = int ('0x3a90b2f2', 16)
-
-    # XOR them
-    uid_nt = uid ^ nt
-    print ('Nt^UID={}'.format(hex (uid_nt)))
+    # Init the cipher
+    cipher = Crypto1(0xFFFFFFFFFFFF)
+    print ('key={}'.format (hex(cipher.KeyReverse())))
+    uid=0x6ad2f78d
+    nt=0x01200145
+    nr=0x2309067a
+    print ('uid={} nt={} nr={}'.format(hex(uid), hex(nt), hex(nr)))
     
-    cipher = Crypto1(0x112233445566)
-    print (hex(cipher.KeyReverse ()))
-    print (hex(cipher.GetByte (0x11)))
-    print (hex(cipher.GetByte (0x22)))
-    print (hex(cipher.GetByte (0x33)))
-    print (hex(cipher.GetByte (0x44)))
-    print (hex (cipher.GetWord (uid_nt)))
-    print (hex (cipher.GetWord (uid_nt, encrypt=True)))
-
-
+    # Do auth on reader
+    resp = cipher.ReaderAuth (uid=uid, nt=nt, nr=nr)
+    for b in resp:
+        print ('{} '.format(hex (b)), end='')
+    print ()
+    resp = cipher.CardAuth ()
+    for b in resp:
+        print ('{} '.format(hex (b)), end='')    
+    print ()
