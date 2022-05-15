@@ -52,7 +52,10 @@ class CNFArray:
             _.append(offset * x)
             offset += 1
         return _
-    
+
+    def Reverse(self):
+        self._val.reverse ()
+        
     def __iter__(self):
         self.idx = 0
         return self
@@ -97,8 +100,12 @@ class Cipher1Solver:
         
         # Solve equation with new assumption
         sat, solution = self.solver.solve (assumptions=cnf_array.asList(self.known_offset))
-        key = CNFArray (solution[1:49])
-        return key
+        if sat:
+            key = CNFArray (solution[1:49])
+            return key
+        else:
+            print ("Cannot solve")
+            return 0
         
     # Parse the CNF into internal partial CNF without input bits
     def ParseCNF(self, cnf_filename):
@@ -175,7 +182,8 @@ def GenCNF (bitlen, shift):
             '--outputs', str(bitlen),
             '--base-shift', str(shift)]
     #print (args)
-    proc = subprocess.Popen (args, stdout = subprocess.PIPE)
+    proc = subprocess.Popen (args, stderr=subprocess.PIPE, stdout = subprocess.PIPE)
+    proc.wait ()
     if proc.stderr:
         print (proc.stderr.readlines())
 
@@ -215,7 +223,8 @@ if __name__ == '__main__':
     if args.gen_bits:
         solver = GenCNF (args.gen_bits, args.shift)
         #known = CNFArray ('0xe9fc41c974630008', length=64)
-        known = CNFArray ('0x5a7be10a7259ef48', length=64)
+        #known = CNFArray ('0x1e52ce111bfbbb18', length=64)
+        known = CNFArray ('0xbfa84f0b80a1ade1', length=64)
         print (known)
         key = solver.Solve (known)
         print (key.asHex())
