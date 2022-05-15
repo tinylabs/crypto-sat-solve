@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from pylfsr import LFSR
 import struct
+from Crypto1SAT import *
 
 # Helper functions
 def int2binarr (val, length):
@@ -237,75 +238,79 @@ class Crypto1:
         uid_nt = uid ^ nt
         self.GetWord (uid ^ nt)
         # Generate Nr
-        print ('State before Nr: ', end='')
-        dump_binarr (self.State())
         Nr = self.GetWord (nr) ^ nr
         # Generate Ar
         self.prng = PRNG (nt)
         # Cycle 32bits
         self.prng.GetWord ()
         ntp = int.from_bytes([self.prng.GetByte() for x in range (4)], 'big')
-        tmp = self.GetWord()
-        Ar = ntp ^ tmp
+        Ar = ntp ^ self.GetWord()
         return Nr.to_bytes (4, 'big') + Ar.to_bytes (4, 'big')
 
     def CardAuth (self):
         ntp = int.from_bytes([self.prng.GetByte() for x in range (4)], 'big')
-        tmp = self.GetWord()
-        At = ntp ^ tmp
+        At = ntp ^ self.GetWord()
         return At.to_bytes (4, 'big')
+
+    # Extract key given UID, Nt and successful encrypted AUTH
+    # Nr, Ar, At
+    @staticmethod
+    def Attack (uid, nt, enc_nr, enc_ar, enc_at):
+        # Calc prng at attack time
+        prng = PRNG (nt)
+        prng.GetWord ()
+        pr1 = prng.GetWord ()
+        pr2 = prng.GetWord ()
+
+        # Calculate input data for attack
+        ar_xor_pr1 = enc_ar ^ pr1
+        at_xor_pr2 = enc_at ^ pr2
+
+        # Reverse permute to get raw stream
+        ks1 = Crypto1.RPermute32(ar_xor_pr1)
+        ks2 = Crypto1.RPermute32(at_xor_pr2)
+
+        # Run through pre-generate CNF sat solver
+        ks = ks1 << 32 | ks2
+        output = CNFArray (ks, 64)
+        solver = Crypto1Solver ()
+        solver.ParseCNF ('data/crypto1-64.cnf')
+        state = solver.Solve (output)
+
+        # Generate new Cipher with known state
+        sim = Crypto1 (state=state.asHex())
+
+        # Reverse using cs0
+        sim.Reverse32 (enc_nr, xor_nlf=True)
+        # Reverse to sr @time=0 (key)
+        sim.Reverse32 (uid ^ nt)
+
+        # Return key
+        return sim.KeyReverse()
         
 if __name__ == '__main__':
 
     # Init the cipher
     cipher = Crypto1(0xA0A1A2A3A4A5)
-    print ('key={}'.format (hex(cipher.KeyReverse())))
     uid=0x6ad2f78d
     nt=0x01200145
     nr=0x797edb15
+    print ('key={}'.format (hex(cipher.KeyReverse())))
     print ('uid={} nt={} nr={}'.format(hex(uid), hex(nt), hex(nr)))
 
-    # Do auth on reader
-    resp1 = cipher.ReaderAuth (uid=uid, nt=nt, nr=nr)
-    for b in resp1:
+    # Simulate sucessful authentication
+    reader_resp = cipher.ReaderAuth (uid=uid, nt=nt, nr=nr)
+    for b in reader_resp:
         print ('{} '.format(hex (b)), end='')
     print ()
-    resp2 = cipher.CardAuth ()
-    for b in resp2:
+    tag_resp = cipher.CardAuth ()
+    for b in tag_resp:
         print ('{} '.format(hex (b)), end='')    
     print ()
 
-    print ('==================')
-    print ('Recovering key...')
-    print ('Known UID: {}'.format (hex (uid)))
-    print ('Known Nt:  {}'.format (hex (nt)))
-    cs1 = struct.unpack ('>I', resp1[4:])[0]
-    cs2 = struct.unpack ('>I', resp2)[0]
-    print ('Sniffed cs1={} cs2={}'.format (hex (cs1), hex (cs2)))
-    prng = PRNG (nt)
-    prng.GetWord ()
-    pr1 = prng.GetWord ()
-    pr2 = prng.GetWord ()
-    print ('Known pr1={} pr2={} (derived from Nt)'.format (hex (pr1), hex (pr2)))
-    cs1_xor_pr1 = cs1 ^ pr1
-    cs2_xor_pr2 = cs2 ^ pr2
-    print ('cs1^pr1={} cs2^pr2={}'.format (hex (cs1_xor_pr1), hex (cs2_xor_pr2)))
-    print ('Reverse permute to get raw stream')
-    ks1 = Crypto1.RPermute32(cs1_xor_pr1)
-    ks2 = Crypto1.RPermute32(cs2_xor_pr2)
-    print ('ks1={} ks2={}'.format (hex (ks1), hex (ks2)))
-    print ('Run SAT Solver on {} {}'.format (hex(ks1),hex(ks2)))
-    solution=0x2e3eb992fc85
-    print ('Result sr2: {}'.format (hex(solution)))
-    
-    # Generate new SR with state
-    print ('Generate new Cipher with known state')
-    sim = Crypto1 (state=solution)
-
-    # Reverse using cs0
-    cs0 = struct.unpack ('>I', resp1[0:4])[0]
-    sim.Reverse32 (cs0, xor_nlf=True)
-    print ('State Nr\'=', end='')
-    dump_binarr (sim.State())
-    sim.Reverse32 (uid ^ nt)
-    print ('Key={}'.format(hex(sim.KeyReverse())))
+    print ('===================')
+    print ('Recovering key with algebraic attack...')
+    enc_nr, enc_ar = struct.unpack ('>II', reader_resp)
+    enc_at = struct.unpack ('>I', tag_resp)[0]
+    key = Crypto1.Attack (uid, nt, enc_nr, enc_ar, enc_at)
+    print ('Key={}'.format (hex (key)))

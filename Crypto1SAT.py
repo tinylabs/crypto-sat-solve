@@ -85,7 +85,7 @@ class CNFArray:
                 x |= 1 
         return hex(x)
 
-class Cipher1Solver:
+class Crypto1Solver:
     def __init__(self):
         # Set on init
         self.known_offset = 0
@@ -155,14 +155,18 @@ class Cipher1Solver:
             self.known_offset = abs (known[0])
             
             # Generate partial solution
-            start = time.time()
-            sat, solution = self.solver.solve ()
-            end = time.time()
-            print ('Solvable={} {}'.format (sat, end-start))
+            #start = time.time()
+            #sat, solution = self.solver.solve ()
+            #end = time.time()
+            #print ('Solvable={} {}'.format (sat, end-start))
             
 # Gen CNF problem
 def GenCNF (bitlen, shift):
 
+    seed = 'e9fc41c9746300088391274fac655039e179533ce0f43dc5582f436a8d0b6fb0'
+    seedlen = int(math.ceil (bitlen / 4))
+    seed = seed[0:seedlen]
+    
     # Change working directory
     cdir = os.getcwd()
     os.chdir (cdir + '/grainofsalt/build')
@@ -170,7 +174,7 @@ def GenCNF (bitlen, shift):
     # Calculate filename and path
     # Fix name calc from output len
     filename = 'crypto1-0-' + str(bitlen) + '-' + \
-               str(shift) + '-0xe9fc41c974630008-1.cnf'
+               str(shift) + '-0x' + seed + '-1.cnf'
     abspath = os.getcwd() + '/satfiles/' + filename
 
     # Call grainofsalt
@@ -181,37 +185,26 @@ def GenCNF (bitlen, shift):
             '--nopropagate',
             '--outputs', str(bitlen),
             '--base-shift', str(shift)]
-    #print (args)
     proc = subprocess.Popen (args, stderr=subprocess.PIPE, stdout = subprocess.PIPE)
     proc.wait ()
-    if proc.stderr:
-        print (proc.stderr.readlines())
+    #if proc.stderr:
+    #    print (proc.stderr.readlines())
 
-    # Parse cnf to create pickle
-    cs = Cipher1Solver ()
-    cs.ParseCNF (abspath)
-    
-    # Cleanup
-    #print ('Cleaning up: {}'.format (abspath))
-    #shutil.rmtree(abspath)
-    
+    # Print generated CNF
+    print ('Generated CNF: {}'.format (abspath))
+        
     # Restore working directory
     os.chdir (cdir)
-
-    # Return solver object
-    return cs
 
 # Parse args
 if __name__ == '__main__':
     parser = argparse.ArgumentParser ()
 
     # Specify arguments
-    parser.add_argument ('--gen-bits', type=int,
+    parser.add_argument ('--gen-cnf', type=int,
                         help='generate CNF given N observed bits')
     parser.add_argument ('--shift', type=int,
                          help='shift base SR before generating [0:49]')
-    parser.add_argument ('--output', type=int,
-                         help='file to write pickled CNF')
     # Parse args
     args = parser.parse_args ()
 
@@ -220,11 +213,5 @@ if __name__ == '__main__':
         args.shift = 0
 
     # Call generator
-    if args.gen_bits:
-        solver = GenCNF (args.gen_bits, args.shift)
-        #known = CNFArray ('0xe9fc41c974630008', length=64)
-        #known = CNFArray ('0x1e52ce111bfbbb18', length=64)
-        known = CNFArray ('0xbfa84f0b80a1ade1', length=64)
-        print (known)
-        key = solver.Solve (known)
-        print (key.asHex())
+    if args.gen_cnf:
+        GenCNF (args.gen_cnf, args.shift)
