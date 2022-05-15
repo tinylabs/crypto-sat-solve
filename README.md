@@ -1,20 +1,26 @@
-Python tools for the following:
-- Generate CNF for time reversal
-- Load CNF
-- Pass output bits and solve for possible keys
-
-// THis seems to work well for generation
-// outputs is variable
-./grainofsalt --outputs 50 --crypto crypto1 --karnaugh 8 --xorclauses --nopropagate
-
-When loading
-- Extract variable IDs of outputs
-- Extract variable IDs of SR[0][0:47]
-- Clauses that define output literals are removed on loading
-
-Solving
-- Observed outputs are passed to partially loaded model as literal clauses
-- SAT solver then solves for possible SR[0][0]-SR[0][47] state
-- Array of possible keys is produced
-
-
+### Mifare Crypto1 algebraic attack using SAT solver
+Python module to solve for Mifare classic 48bit key using a single successful sniffed transaction.  
+This attack requires no dependencies on implementation and typically completes in less than a minute  
+on a modern PC.  
+#### Inputs - Single sniffed authentication
+- UID, Nt (Plaintext card nonce)
+- enc_nr, enc_ar, enc_at
+#### Dependencies
+- pylfsr
+#### Sample usage
+    time ./Crypto1.py 
+    key=0x4fd7605e1ce5
+    uid=0x7a39c16f nt=0x35ecd241 nr=0x4317ee49
+    0x7c 0x7f 0x52 0xf3 0x68 0x7 0x96 0x75 
+    0x5b 0xda 0xa 0x41 
+    ===================
+    Recovering key with algebraic attack...
+    Key=0x4fd7605e1ce5
+    
+    real    0m10.304s
+    user    0m20.684s
+    sys     0m0.796s
+#### Papers
+- Built on research from Karsten Nohl and Mate Soos
+- https://eprint.iacr.org/2008/166.pdf
+- https://www.msoos.org/wordpress/wp-content/uploads/2011/03/Extending_SAT_2009.pdf
