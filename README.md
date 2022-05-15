@@ -3,7 +3,7 @@ Python module to solve for Mifare classic 48bit key using a single successful sn
 This attack requires no dependencies on implementation and typically completes in less than a minute  
 on a modern PC.  
 #### Inputs - Single sniffed authentication
-- UID, Nt (Plaintext card nonce)
+- UID, Nt (plaintext UID and card nonce)
 - enc_nr, enc_ar, enc_at
 #### Dependencies
 - pylfsr
