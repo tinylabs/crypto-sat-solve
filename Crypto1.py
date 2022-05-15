@@ -3,11 +3,10 @@
 # Mifare cipher1 implementation in python
 #
 
-import numpy as np
-import matplotlib.pyplot as plt
 from pylfsr import LFSR
-import struct
 from Crypto1SAT import *
+import struct
+import random
 
 # Helper functions
 def int2binarr (val, length):
@@ -270,7 +269,8 @@ class Crypto1:
         ks1 = Crypto1.RPermute32(ar_xor_pr1)
         ks2 = Crypto1.RPermute32(at_xor_pr2)
 
-        # Run through pre-generate CNF sat solver
+        # Run keystream through SAT solver to
+        # recover state after enc_nr
         ks = ks1 << 32 | ks2
         output = CNFArray (ks, 64)
         solver = Crypto1Solver ()
@@ -291,10 +291,10 @@ class Crypto1:
 if __name__ == '__main__':
 
     # Init the cipher
-    cipher = Crypto1(0xA0A1A2A3A4A5)
-    uid=0x6ad2f78d
-    nt=0x01200145
-    nr=0x797edb15
+    cipher = Crypto1(random.randint (0, 2**48))
+    uid = random.randint(0, 2**32)
+    nt  = random.randint(0, 2**32)
+    nr  = random.randint(0, 2**32)
     print ('key={}'.format (hex(cipher.KeyReverse())))
     print ('uid={} nt={} nr={}'.format(hex(uid), hex(nt), hex(nr)))
 
