@@ -181,7 +181,7 @@ def GenCNF (bitlen, shift):
     args = ['./grainofsalt',
             '--crypto=crypto1',
             '--karnaugh=8',
-            #'--xorclauses',
+            '--xorclauses',
             '--nopropagate',
             '--outputs', str(bitlen),
             '--base-shift', str(shift)]

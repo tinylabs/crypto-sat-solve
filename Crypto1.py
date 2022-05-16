@@ -274,7 +274,7 @@ class Crypto1:
         ks = ks1 << 32 | ks2
         output = CNFArray (ks, 64)
         solver = Crypto1Solver ()
-        solver.ParseCNF ('data/crypto1-64.cnf')
+        solver.ParseCNF ('data/crypto1-64-xor.cnf')
         state = solver.Solve (output)
 
         # Generate new Cipher with known state
