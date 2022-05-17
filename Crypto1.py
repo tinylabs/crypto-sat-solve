@@ -202,9 +202,6 @@ class Crypto1:
             ret.append (self.GetBit(inp[n]))
         return ret
 
-    def Permute8 (self, inp=0):
-        return binarr2int (self.Raw (8, int2binarr (inp, 8))[::-1])
-
     @staticmethod
     def RPermute8 (val):
         return binarr2int (int2binarr (val, 8)[::-1])
