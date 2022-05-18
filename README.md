@@ -6,6 +6,7 @@ on a modern PC.
 - UID, Nt (plaintext UID and card nonce)
 - enc_nr, enc_ar, enc_at
 #### Dependencies
+- pycryptosat
 - pylfsr
 #### Sample usage
     time ./Crypto1.py 
