@@ -5,9 +5,16 @@ on a modern PC.
 #### Inputs - Single sniffed authentication
 - UID, Nt (plaintext UID and card nonce)
 - enc_nr, enc_ar, enc_at
-#### Dependencies
-- pycryptosat
-- pylfsr
+#### Compiling
+    sudo apt-get install libboost-all-dev cmake zlib1g-dev
+    sudo python3 -m pip install numpy matplotlib pylfsr pycryptosat
+    git clone git@github.com:tinylabs/crypto-sat-solve.git
+    cd crypto-sat-solve
+    git submodule update
+    cd grainofsalt/build
+    cmake ../
+    make -j
+    cd ../..
 #### Sample usage
     time ./Crypto1.py 
     key=0x4fd7605e1ce5
