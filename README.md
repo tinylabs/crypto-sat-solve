@@ -2,6 +2,8 @@
 Python module to solve for Mifare classic 48bit key using a single successful sniffed transaction.  
 This attack requires no dependencies on implementation and typically completes in less than a minute  
 on a modern PC.  
+  
+NOTE: For anyone concerned this is breaking security a direct attack has been available for sometime that is magnitudes faster than this SAT solver attack: https://github.com/RfidResearchGroup/proxmark3/blob/master/tools/mfkey/mfkey64.c
 #### Inputs - Single sniffed authentication
 - UID, Nt (plaintext UID and card nonce)
 - enc_nr, enc_ar, enc_at
